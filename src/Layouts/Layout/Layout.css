@@ -1,0 +1,24 @@
+/* Soft yellow gradient background like your design */
+.layout-bg {
+  width: 100%;
+  background: linear-gradient(to bottom right, #fad55d, #fdfdfd);
+  font-family: "Segoe UI", sans-serif;
+}
+
+/*subtle fade-in animation */
+.layout-bg {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
