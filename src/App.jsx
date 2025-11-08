@@ -9,7 +9,7 @@ function App() {
   // New change
 
   return (
-    <Router>
+    <Router basename='/attendance_web'>
       <Routes>
         <Route path="/" element={<Attendance />} />
       </Routes>
