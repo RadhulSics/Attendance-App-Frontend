@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "../Layouts/Layout/Layout";
 import { toast } from "react-toastify";
+import { markAttendance } from "../services/attendanceService";
 
 const Attendance = () => {
   const randomNames = [
@@ -15,12 +16,13 @@ const Attendance = () => {
     "James Thomas",
   ];
 
-  const [attendance, setAttendance] = useState({});
+  const [records, setRecords] = useState({});
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [sText, setSText] = useState("");
   const [vTexts, setVTexts] = useState([""]);
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
 
-  // Bootstrap modal refs
+  // Initialize Bootstrap modals
   useEffect(() => {
     const sModalEl = document.getElementById("sModal");
     const vModalEl = document.getElementById("vModal");
@@ -30,12 +32,47 @@ const Attendance = () => {
     }
   }, []);
 
-  const handleAttendance = (name, status) => {
-    setAttendance((prev) => ({ ...prev, [name]: { status } }));
-    toast.info(`${name} marked as ${status}`, { icon: "✅" });
-    console.log("Attendance Updated:", { ...attendance, [name]: { status } });
+  // Helper to build record format
+  const createRecord = (name, data = {}) => {
+    const base = records[name] || {
+      name,
+      date: new Date(date).toISOString(),
+      attendance: { present: false, absent: false },
+      specialNote: {},
+      visits: [],
+    };
+    return { ...base, ...data };
   };
 
+  // Function to send data to backend
+  const submitToBackend = async (record) => {
+  console.log("📤 Submitting:", record);
+  const result = await markAttendance(record);
+
+  if (result.success) {
+    // toast.success(`✅ ${record.name}'s attendance submitted`);
+  } else {
+    toast.error(`❌ ${record.name} - ${result.message}`);
+  }
+};
+
+
+  // Handle Absent / Present
+  const handleAttendance = (name, status) => {
+    const isPresent = status === "Present";
+    const newRecord = createRecord(name, {
+      attendance: {
+        present: isPresent,
+        absent: !isPresent,
+      },
+    });
+
+    setRecords((prev) => ({ ...prev, [name]: newRecord }));
+    toast.info(`${name} marked as ${status}`);
+    submitToBackend(newRecord);
+  };
+
+  // Special Note modal handlers
   const handleSClick = (name) => {
     setSelectedCustomer(name);
     setSText("");
@@ -48,54 +85,61 @@ const Attendance = () => {
     window.vModal.show();
   };
 
-  // 🟢 Validate before saving S
   const handleSSave = () => {
     if (!sText.trim()) {
       toast.error("Please enter a note before saving.");
       return;
     }
-    setAttendance((prev) => ({
-      ...prev,
-      [selectedCustomer]: { status: "S", note: sText },
-    }));
-    toast.success(`Saved special note for ${selectedCustomer}`);
-    console.log("Attendance Updated:", {
-      ...attendance,
-      [selectedCustomer]: { status: "S", note: sText },
+
+    const newRecord = createRecord(selectedCustomer, {
+      specialNote: { note: sText },
     });
+
+    setRecords((prev) => ({ ...prev, [selectedCustomer]: newRecord }));
+    toast.success(`Saved special note for ${selectedCustomer}`);
+    submitToBackend(newRecord);
     window.sModal.hide();
   };
 
-  // 🟢 Validate before saving V
   const handleVSave = () => {
-    const hasEmptyField = vTexts.some((t) => !t.trim());
-    if (hasEmptyField) {
-      toast.error("Please fill in all visit fields before submitting.");
+    const hasEmpty = vTexts.some((v) => !v.trim());
+    if (hasEmpty) {
+      toast.error("Please fill all visit fields before saving.");
       return;
     }
-    setAttendance((prev) => ({
-      ...prev,
-      [selectedCustomer]: { status: "V", notes: vTexts },
-    }));
-    toast.success(`Saved visit details for ${selectedCustomer}`);
-    console.log("Attendance Updated:", {
-      ...attendance,
-      [selectedCustomer]: { status: "V", notes: vTexts },
+
+    const newRecord = createRecord(selectedCustomer, {
+      visits: vTexts,
     });
+
+    setRecords((prev) => ({ ...prev, [selectedCustomer]: newRecord }));
+    toast.success(`Saved visits for ${selectedCustomer}`);
+    submitToBackend(newRecord);
     window.vModal.hide();
   };
 
   const addVTextField = () => setVTexts([...vTexts, ""]);
-
   const updateVText = (index, value) => {
-    const newTexts = [...vTexts];
-    newTexts[index] = value;
-    setVTexts(newTexts);
+    const updated = [...vTexts];
+    updated[index] = value;
+    setVTexts(updated);
   };
 
   return (
     <Layout>
-      <h2 className="text-center fw-bold mb-4">Attendance</h2>
+      {/* Date Input */}
+      <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <h2 className="fw-bold m-0">Attendance</h2>
+        <input
+          type="date"
+          className="form-control"
+          style={{ maxWidth: "250px" }}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+      </div>
+
+      {/* Attendance Table */}
       <div className="table-responsive w-100">
         <table className="table align-middle text-center table-bordered">
           <tbody>
@@ -140,26 +184,13 @@ const Attendance = () => {
         </table>
       </div>
 
-      {/* --- S Modal --- */}
-      <div
-        className="modal fade"
-        id="sModal"
-        tabIndex="-1"
-        aria-labelledby="sModalLabel"
-        aria-hidden="true"
-      >
+      {/* S Modal */}
+      <div className="modal fade" id="sModal" tabIndex="-1" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content p-3">
             <div className="modal-header">
-              <h5 className="modal-title" id="sModalLabel">
-                Special Note for {selectedCustomer}
-              </h5>
-              <button
-                type="button"
-                className="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Close"
-              ></button>
+              <h5 className="modal-title">Special Note for {selectedCustomer}</h5>
+              <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div className="modal-body">
               <input
@@ -180,26 +211,13 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* --- V Modal --- */}
-      <div
-        className="modal fade"
-        id="vModal"
-        tabIndex="-1"
-        aria-labelledby="vModalLabel"
-        aria-hidden="true"
-      >
+      {/* V Modal */}
+      <div className="modal fade" id="vModal" tabIndex="-1" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content p-3">
             <div className="modal-header">
-              <h5 className="modal-title" id="vModalLabel">
-                Visits for {selectedCustomer}
-              </h5>
-              <button
-                type="button"
-                className="btn-close"
-                data-bs-dismiss="modal"
-                aria-label="Close"
-              ></button>
+              <h5 className="modal-title">Visits for {selectedCustomer}</h5>
+              <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div className="modal-body">
               {vTexts.map((text, index) => (
@@ -214,10 +232,7 @@ const Attendance = () => {
                   />
                 </div>
               ))}
-              <button
-                className="btn btn-outline-primary w-100"
-                onClick={addVTextField}
-              >
+              <button className="btn btn-outline-primary w-100" onClick={addVTextField}>
                 ➕ Add More
               </button>
             </div>
