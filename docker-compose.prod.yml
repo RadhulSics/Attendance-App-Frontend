@@ -1,0 +1,20 @@
+services:
+  attendance-frontend:
+    container_name: attendance-frontend-prod
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - attendance-static:/app/dist
+    networks:
+      - attendance-network
+    restart: unless-stopped
+
+networks:
+  attendance-network:
+    driver: bridge
+
+volumes:
+  attendance-static:
